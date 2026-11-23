@@ -1,114 +1,129 @@
-# 🤖 AI Robot Fleet Coordinator (Multi-Agent System)
+# AI Robot Fleet Coordinator
 
-An intelligent **robot fleet coordination system** built using **CrewAI** that simulates real-world Autonomous Mobile Robot (AMR) decision making.
+A CrewAI-based multi-agent prototype that models how a warehouse robot fleet could coordinate delivery missions. The project separates fleet task allocation, navigation planning, battery checks, and mission reporting into four specialist agents.
 
-This project demonstrates how multiple AI agents collaborate to:
+> **Mission request → Task allocation → Route proposal → Battery review → Mission report**
 
-* Allocate missions
-* Plan robot navigation paths
-* Monitor battery intelligence
-* Execute delivery missions
+## Project goals
 
-Inspired by real industrial robotics fleet orchestration systems.
+Warehouse and industrial AMR fleets need to coordinate work while considering robot availability, workload, route efficiency, and battery constraints. This project explores that coordination pattern through role-specialized LLM agents.
 
----
+## Agent team
 
-## 🚀 Project Motivation
+| Agent | Responsibility in this prototype |
+|---|---|
+| Fleet Task Manager | Reviews the mission request and proposes a robot assignment based on availability, workload, and priority. |
+| Robot Navigation Planner | Produces a proposed route and considers route safety and obstacle avoidance in its reasoning. |
+| Battery Intelligence Agent | Reviews battery-related mission feasibility and can recommend charging before a mission. |
+| Mission Execution Controller | Produces the final mission execution/completion report. |
 
-Modern warehouses and factories deploy fleets of Autonomous Mobile Robots (AMRs).
-Efficient coordination requires intelligent decision-making across multiple subsystems.
+The agents and tasks are defined in `agents/` and `crew.py`. They are coordinated through a CrewAI `Crew` and launched by `main.py`.
 
-This project explores **multi-agent AI orchestration** for robotics fleet management using CrewAI.
+## Architecture
 
----
-
-## 🧠 System Architecture
-
-Fleet Coordination Flow:
-
-```
-Mission Request
-     ↓
-Task Manager Agent
-     ↓
-Path Planner Agent
-     ↓
-Battery Monitor Agent
-     ↓
-Mission Execution Agent
-     ↓
-Mission Completion Report
+```mermaid
+flowchart TD
+    U[Mission request] --> T[Fleet Task Manager]
+    T --> P[Robot Navigation Planner]
+    P --> B[Battery Intelligence Agent]
+    B --> E[Mission Execution Controller]
+    E --> R[Mission report]
 ```
 
----
+## Technology
 
-## 🤖 Agents Overview
+- Python
+- CrewAI
+- LangChain
+- OpenAI integration
+- python-dotenv
 
-### 🔹 Fleet Task Manager
+## Repository structure
 
-* Assigns optimal mission to available robot
-* Considers workload and availability
+```text
+.
+├── agents/
+│   ├── task_manager.py
+│   ├── path_planner.py
+│   ├── battery_monitor.py
+│   └── mission_executor.py
+├── crew.py
+├── main.py
+├── requirements.txt
+└── README.md
+```
 
-### 🔹 Navigation Planner
+## Setup
 
-* Generates safe and shortest paths
-* Inspired by ROS2 Nav2 planning stack
-
-### 🔹 Battery Intelligence Agent
-
-* Predicts mission feasibility based on power levels
-* Prevents mid-mission failures
-
-### 🔹 Mission Execution Controller
-
-* Executes delivery mission
-* Confirms successful completion
-
----
-
-## ⚙️ Tech Stack
-
-* CrewAI (Multi-Agent Orchestration)
-* Python
-* LLM-Driven Reasoning
-* Robotics Fleet Coordination Concepts
-
----
-
-## ▶️ How to Run
+Use a virtual environment:
 
 ```bash
-pip install -r requirements.txt
-export OPENAI_API_KEY="your_api_key"
-python3 main.py
+git clone https://github.com/sunny-shrivas/ai-robot-fleet-coordinator.git
+cd ai-robot-fleet-coordinator
+
+python -m venv .venv
 ```
 
----
+Activate it:
 
-## 📊 Future Enhancements
+**macOS/Linux**
+```bash
+source .venv/bin/activate
+```
 
-* ROS2 Navigation Stack Integration
-* Real Robot Telemetry Input
-* Dynamic Task Reallocation
-* Web Dashboard for Fleet Monitoring
-* Reinforcement Learning for Mission Optimization
-* Multi-Robot Simulation using Gazebo / Isaac Sim
+**Windows PowerShell**
+```powershell
+.venv\Scripts\Activate.ps1
+```
 
----
+Install the dependencies:
 
-## 🎯 Engineering Value
+```bash
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
 
-This project demonstrates:
+Configure the OpenAI credentials required by your installed CrewAI/provider versions. Do not commit API keys. Use environment variables or a local `.env` file that is excluded from version control.
 
-✅ Multi-Agent System Design
-✅ AI Decision Orchestration
-✅ Robotics Fleet Thinking
-✅ System Architecture Skills
-✅ Production-Mindset Repository Structuring
+Example environment variable (set it in your shell or local environment file):
 
----
+```dotenv
+OPENAI_API_KEY=your_api_key_here
+```
 
-## 👨‍💻 Author
+## Run
 
-Sunny Shrivas
-AI Engineer | Robotics Enthusiast | Autonomous Systems Developer
+From the repository root:
+
+```bash
+python main.py
+```
+
+The entry point calls `fleet_crew.kickoff()` and prints the returned mission result. The current task descriptions are predefined in `crew.py`; this is a small proof of concept rather than a configurable fleet simulator.
+
+## Current scope and limitations
+
+This repository demonstrates agent-role decomposition and sequential task orchestration. It does **not** currently provide:
+
+- A connection to physical AMRs, motors, sensors, or robot telemetry.
+- ROS 2 or Nav2 integration.
+- A map-based path-planning algorithm or verified collision avoidance.
+- A numerical battery model, live state-of-charge readings, or battery prediction.
+- A fleet database, dispatch API, or web monitoring dashboard.
+- A deterministic simulation environment or automated test suite.
+
+Route, battery, and execution outputs are LLM-generated recommendations/reports, not validated commands for real robots. Do not use the output to control physical equipment.
+
+## Roadmap
+
+- Add structured mission, robot, and telemetry inputs.
+- Implement deterministic robot assignment and battery-feasibility checks.
+- Integrate a simulated warehouse map and path-planning algorithm.
+- Add ROS 2/Nav2 integration behind a safe simulation boundary.
+- Add unit tests, scenario tests, and evaluation metrics.
+- Build a dashboard for mission status and fleet observability.
+
+## Author
+
+**Sunny Shrivas**  
+AI Engineer | Generative AI | Agentic Systems
