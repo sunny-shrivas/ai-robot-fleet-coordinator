@@ -1,4 +1,2 @@
-crewai
-langchain
-openai
-python-dotenv
+# Core planner and test suite run without network or LLM credentials.
+pytest>=8.0,<10.0

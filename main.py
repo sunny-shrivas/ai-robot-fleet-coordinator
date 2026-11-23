@@ -1,12 +1,21 @@
-from crew import fleet_crew
+"""Run a deterministic, simulation-only fleet coordination demo."""
+import json
 
-def run_fleet_system():
-    print("\n🚀 Starting AI Robot Fleet Coordinator...\n")
-    
-    result = fleet_crew.kickoff()
-    
-    print("\n✅ Fleet Mission Result:\n")
-    print(result)
+from fleet.demo_data import build_demo
+from fleet.visualization import render_plan
+
+
+def run_fleet_system() -> None:
+    coordinator, mission = build_demo()
+    assignment = coordinator.plan_mission(mission)
+    robot = coordinator.robots.get(assignment.robot_id) if assignment.robot_id else None
+
+    print("\n=== AI ROBOT FLEET COORDINATOR ===")
+    print("Deterministic planning demo — simulation only; no robot commands are sent.\n")
+    print(json.dumps(assignment.to_dict(), indent=2))
+    print("\nWarehouse grid:")
+    print(render_plan(coordinator.grid, assignment, robot, mission.pickup, mission.destination))
+
 
 if __name__ == "__main__":
     run_fleet_system()
