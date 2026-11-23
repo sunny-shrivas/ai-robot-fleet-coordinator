@@ -1,9 +1,21 @@
-"""Typed domain models for the deterministic fleet core."""
+"""Typed and validated domain models for the fleet planner."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+import math
 from typing import Any
+
+
+def _finite_number(name: str, value: Any, *, minimum: float | None = None) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{name} must be a finite number.")
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError(f"{name} must be a finite number.")
+    if minimum is not None and number < minimum:
+        raise ValueError(f"{name} must be at least {minimum}.")
+    return number
 
 
 class RobotStatus(str, Enum):
@@ -25,16 +37,22 @@ class Position:
     x: int
     y: int
 
+    def __post_init__(self) -> None:
+        if (
+            isinstance(self.x, bool)
+            or isinstance(self.y, bool)
+            or not isinstance(self.x, int)
+            or not isinstance(self.y, int)
+        ):
+            raise ValueError("Position coordinates must be integers.")
+
     @classmethod
     def from_value(cls, value: Any) -> "Position":
         if isinstance(value, cls):
             return value
         if not isinstance(value, (list, tuple)) or len(value) != 2:
             raise ValueError("Position must be a 2-item [x, y] coordinate.")
-        x, y = value
-        if isinstance(x, bool) or isinstance(y, bool) or not isinstance(x, int) or not isinstance(y, int):
-            raise ValueError("Position coordinates must be integers.")
-        return cls(x=x, y=y)
+        return cls(x=value[0], y=value[1])
 
     def as_list(self) -> list[int]:
         return [self.x, self.y]
@@ -50,12 +68,20 @@ class Robot:
     name: str = ""
 
     def __post_init__(self) -> None:
-        if not self.robot_id.strip():
+        if not isinstance(self.robot_id, str) or not self.robot_id.strip():
             raise ValueError("robot_id cannot be empty.")
-        if not 0 <= self.battery_pct <= 100:
+        battery = _finite_number("battery_pct", self.battery_pct, minimum=0)
+        if battery > 100:
             raise ValueError("battery_pct must be between 0 and 100.")
-        if self.max_payload_kg < 0:
-            raise ValueError("max_payload_kg cannot be negative.")
+        self.battery_pct = battery
+
+        payload = _finite_number("max_payload_kg", self.max_payload_kg, minimum=0)
+        self.max_payload_kg = payload
+
+        try:
+            self.status = RobotStatus(self.status)
+        except ValueError as exc:
+            raise ValueError(f"Unsupported robot status: {self.status}") from exc
 
 
 @dataclass
@@ -69,16 +95,18 @@ class Mission:
     reserve_battery_pct: float = 20.0
 
     def __post_init__(self) -> None:
-        if not self.mission_id.strip():
+        if not isinstance(self.mission_id, str) or not self.mission_id.strip():
             raise ValueError("mission_id cannot be empty.")
-        if self.payload_kg < 0:
-            raise ValueError("payload_kg cannot be negative.")
-        if not 1 <= self.priority <= 5:
-            raise ValueError("priority must be between 1 and 5.")
-        if self.estimated_energy_pct_per_step < 0:
-            raise ValueError("estimated_energy_pct_per_step cannot be negative.")
-        if not 0 <= self.reserve_battery_pct <= 100:
+        self.payload_kg = _finite_number("payload_kg", self.payload_kg, minimum=0)
+        if isinstance(self.priority, bool) or not isinstance(self.priority, int) or not 1 <= self.priority <= 5:
+            raise ValueError("priority must be an integer between 1 and 5.")
+        self.estimated_energy_pct_per_step = _finite_number(
+            "estimated_energy_pct_per_step", self.estimated_energy_pct_per_step, minimum=0
+        )
+        reserve = _finite_number("reserve_battery_pct", self.reserve_battery_pct, minimum=0)
+        if reserve > 100:
             raise ValueError("reserve_battery_pct must be between 0 and 100.")
+        self.reserve_battery_pct = reserve
 
 
 @dataclass

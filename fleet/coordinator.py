@@ -2,10 +2,18 @@
 from __future__ import annotations
 
 from fleet.grid import GridMap
-from fleet.models import Assignment, Mission, MissionStatus, Robot, RobotStatus
+from fleet.models import Assignment, Mission, MissionStatus, Position, Robot, RobotStatus
 
 
 class FleetCoordinator:
+    """Plans a single mission against a snapshot of known robot state.
+
+    Selection is lexicographic: shortest feasible total route first, then
+    highest projected remaining battery, then stable robot ID. Planning does
+    not reserve a robot or mutate telemetry; callers must revalidate state
+    before any future dispatch integration.
+    """
+
     def __init__(self, grid: GridMap, robots: list[Robot]):
         self.grid = grid
         self.robots = {robot.robot_id: robot for robot in robots}
@@ -13,7 +21,7 @@ class FleetCoordinator:
             raise ValueError("Robot IDs must be unique.")
 
     def plan_mission(self, mission: Mission) -> Assignment:
-        candidates: list[tuple[float, int, str, Robot, list]] = []
+        candidates: list[tuple[int, float, str, list[Position]]] = []
         rejection_reasons: list[str] = []
 
         for robot in self.robots.values():
@@ -23,16 +31,16 @@ class FleetCoordinator:
             if mission.payload_kg > robot.max_payload_kg:
                 rejection_reasons.append(f"{robot.robot_id}: payload exceeds capacity")
                 continue
+
             try:
-                route = self.grid.shortest_path(robot.position, mission.pickup)
+                to_pickup = self.grid.shortest_path(robot.position, mission.pickup)
                 delivery_route = self.grid.shortest_path(mission.pickup, mission.destination)
             except ValueError as exc:
                 rejection_reasons.append(f"{robot.robot_id}: {exc}")
                 continue
 
-            # Join segments without duplicating the pickup waypoint.
-            full_route = route + delivery_route[1:]
-            steps = max(0, len(full_route) - 1)
+            route = to_pickup + delivery_route[1:]
+            steps = len(route) - 1
             energy_required = steps * mission.estimated_energy_pct_per_step
             battery_after = robot.battery_pct - energy_required
 
@@ -43,9 +51,7 @@ class FleetCoordinator:
                 )
                 continue
 
-            # Prefer a feasible robot with the largest remaining charge, then fewer steps.
-            score = (battery_after, -steps)
-            candidates.append((score[0], score[1], robot.robot_id, robot, full_route))
+            candidates.append((steps, battery_after, robot.robot_id, route))
 
         if not candidates:
             reason = "; ".join(rejection_reasons) or "No available robots."
@@ -56,9 +62,8 @@ class FleetCoordinator:
                 reason=reason,
             )
 
-        candidates.sort(key=lambda item: (-item[0], -item[1], item[2]))
-        battery_after, neg_steps, robot_id, robot, route = candidates[0]
-        steps = -neg_steps
+        candidates.sort(key=lambda item: (item[0], -item[1], item[2]))
+        steps, battery_after, robot_id, route = candidates[0]
         return Assignment(
             mission_id=mission.mission_id,
             robot_id=robot_id,
@@ -66,5 +71,8 @@ class FleetCoordinator:
             route=route,
             estimated_steps=steps,
             estimated_battery_after_pct=round(battery_after, 2),
-            reason="Feasible plan generated. No command has been sent to a robot.",
+            reason=(
+                "Feasible plan generated using the current state snapshot. "
+                "No command has been sent to a robot."
+            ),
         )

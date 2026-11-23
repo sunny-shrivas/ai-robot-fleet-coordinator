@@ -16,16 +16,18 @@ def mission(**kwargs):
     return Mission(**values)
 
 
-def test_selects_feasible_robot_with_best_battery_then_route():
+def test_selects_shortest_feasible_route_before_battery_tiebreak():
     grid = GridMap(6, 2)
     robots = [
-        Robot("low", Position(0, 0), 30),
-        Robot("high", Position(0, 1), 90),
+        Robot("near", Position(0, 0), 65),
+        Robot("far", Position(0, 1), 95),
     ]
     assignment = FleetCoordinator(grid, robots).plan_mission(mission())
-    assert assignment.robot_id == "high"
+    assert assignment.robot_id == "near"
     assert assignment.status == MissionStatus.READY
-    assert assignment.route[0] == Position(0, 1)
+    assert assignment.estimated_steps == 4
+    assert assignment.estimated_battery_after_pct == 57
+    assert assignment.route[0] == Position(0, 0)
     assert assignment.route[-1] == Position(4, 0)
 
 
@@ -54,5 +56,15 @@ def test_rejects_busy_or_payload_incompatible_robot():
 
 def test_duplicate_robot_ids_rejected():
     robot = Robot("same", Position(0, 0), 90)
-    with __import__("pytest").raises(ValueError, match="unique"):
+    import pytest
+    with pytest.raises(ValueError, match="unique"):
         FleetCoordinator(GridMap(2, 2), [robot, robot])
+
+
+def test_no_robot_available_returns_rejection():
+    assignment = FleetCoordinator(GridMap(2, 2), []).plan_mission(
+        mission(pickup=Position(0, 0), destination=Position(1, 1))
+    )
+    assert assignment.status == MissionStatus.REJECTED
+    assert assignment.robot_id is None
+    assert assignment.reason == "No available robots."
